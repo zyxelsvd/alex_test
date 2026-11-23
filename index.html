@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f4f3ee">
+  <title>簡易計算機</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100svh; display: grid; place-items: center; padding: 28px 20px; background: #f4f3ee; color: #293c36; font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif; }
+    main { width: min(100%, 360px); }
+    header { margin-bottom: 28px; text-align: center; }
+    .eyebrow { margin: 0 0 10px; color: #6d8074; font-size: 11px; font-weight: 650; letter-spacing: .24em; }
+    h1 { margin: 0; font-size: 25px; font-weight: 600; letter-spacing: .12em; }
+    .calculator { padding: 22px; background: #fffefa; border: 1px solid #e2e6dd; border-radius: 28px; box-shadow: 0 18px 45px #293c360b, 0 2px 5px #293c3605; }
+    .screen { min-height: 132px; padding: 18px 16px; margin-bottom: 20px; border: 1px solid #dfe5da; border-radius: 15px; background: #edf1e7; text-align: right; }
+    #expression { min-height: 22px; overflow-wrap: anywhere; color: #74816d; font-size: 14px; }
+    #display { display: block; width: 100%; margin-top: 9px; overflow-wrap: anywhere; font-size: clamp(25px, 7.8vw, 40px); font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
+    .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    button { min-height: 62px; border: 1px solid #e8e9e2; border-radius: 13px; background: #f7f7f2; color: #34463e; font: 500 23px system-ui, sans-serif; cursor: pointer; touch-action: manipulation; transition: background .15s, transform .1s; }
+    button:hover { background: #edeee6; }
+    button:active { transform: scale(.95); }
+    button:focus-visible { outline: 3px solid #8aab8c; outline-offset: 3px; }
+    .clear { grid-column: span 3; background: #eceee5; text-align: left; padding-left: 24px; font-size: 18px; }
+    .operator { background: #e9eedf; color: #5c7052; }
+    .operator[aria-pressed="true"] { background: #cfdcc0; }
+    .zero { grid-column: span 2; }
+    .equals { background: #5e795f; border-color: #5e795f; color: white; }
+    .equals:hover { background: #4d684f; }
+    footer { margin-top: 22px; color: #8a9185; text-align: center; font-size: 12px; letter-spacing: .04em; }
+  </style>
+</head>
+<body>
+  <main>
+    <header><p class="eyebrow">EVERYDAY CALCULATOR</p><h1>簡易計算機</h1></header>
+    <section class="calculator" aria-label="計算機">
+      <div class="screen"><div id="expression" aria-hidden="true"></div><output id="display" aria-live="polite" aria-atomic="true">0</output></div>
+      <div class="keys">
+        <button class="clear" data-action="clear" aria-label="清除">C</button>
+        <button class="operator" data-operator="/" aria-label="除" aria-pressed="false">÷</button>
+        <button data-digit="7">7</button><button data-digit="8">8</button><button data-digit="9">9</button>
+        <button class="operator" data-operator="*" aria-label="乘" aria-pressed="false">×</button>
+        <button data-digit="4">4</button><button data-digit="5">5</button><button data-digit="6">6</button>
+        <button class="operator" data-operator="-" aria-label="減" aria-pressed="false">−</button>
+        <button data-digit="1">1</button><button data-digit="2">2</button><button data-digit="3">3</button>
+        <button class="operator" data-operator="+" aria-label="加" aria-pressed="false">+</button>
+        <button class="zero" data-digit="0">0</button><button data-digit="." aria-label="小數點">.</button>
+        <button class="equals" data-action="equals" aria-label="等於">=</button>
+      </div>
+    </section>
+    <footer>支援鍵盤輸入 · 按 Esc 清除</footer>
+  </main>
+  <script>
+    const display = document.querySelector('#display');
+    const expression = document.querySelector('#expression');
+    const symbols = { '+': '+', '-': '−', '*': '×', '/': '÷' };
+    let value = '0', stored = null, operator = null, fresh = false, failed = false;
+
+    function render() {
+      display.textContent = value;
+      document.querySelectorAll('[data-operator]').forEach(button => {
+        button.setAttribute('aria-pressed', String(operator === button.dataset.operator));
+      });
+    }
+    function clear() {
+      value = '0'; stored = null; operator = null; fresh = false; failed = false;
+      expression.textContent = '';
+      render();
+    }
+    function digit(key) {
+      if (failed) clear();
+      if (fresh) { value = '0'; fresh = false; }
+      if (!operator) expression.textContent = '';
+      if (key === '.') {
+        if (!value.includes('.')) value += '.';
+      } else if (value === '0') value = key;
+      else if (value.replace(/[-.]/g, '').length < 12) value += key;
+      render();
+    }
+    function calculate() {
+      const right = Number(value);
+      const left = stored;
+      const result = operator === '+' ? left + right : operator === '-' ? left - right : operator === '*' ? left * right : left / right;
+      if (!Number.isFinite(result)) {
+        value = right === 0 && operator === '/' ? '無法除以零' : '超出計算範圍';
+        failed = true; stored = null; operator = null; fresh = true;
+        render();
+        return false;
+      }
+      value = String(Number(result.toPrecision(12)));
+      return true;
+    }
+    function chooseOperator(next) {
+      if (failed) return;
+      if (operator && !fresh && !calculate()) return;
+      stored = Number(value); operator = next; fresh = true;
+      expression.textContent = `${value} ${symbols[next]}`;
+      render();
+    }
+    function equals() {
+      if (!operator || failed) return;
+      const equation = `${stored} ${symbols[operator]} ${value} =`;
+      if (!calculate()) return;
+      expression.textContent = equation;
+      stored = null; operator = null; fresh = true;
+      render();
+    }
+    document.querySelector('.keys').addEventListener('click', event => {
+      const button = event.target.closest('button');
+      if (!button) return;
+      if (button.dataset.digit !== undefined) digit(button.dataset.digit);
+      else if (button.dataset.operator) chooseOperator(button.dataset.operator);
+      else if (button.dataset.action === 'clear') clear();
+      else equals();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (/^[0-9.]$/.test(event.key)) digit(event.key);
+      else if (['+', '-', '*', '/'].includes(event.key)) chooseOperator(event.key);
+      else if (event.key === '=' || event.key === 'Enter') {
+        if (event.key === 'Enter' && event.target.closest('button')) return;
+        equals();
+      }
+      else if (event.key === 'Escape' || event.key.toLowerCase() === 'c') clear();
+      else return;
+      event.preventDefault();
+    });
+  </script>
+</body>
+</html>
